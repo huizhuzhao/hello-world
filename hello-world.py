@@ -4,3 +4,4 @@
 print 'Hello world!'
 print '--'*20
 print '**'*20
+print 'add an log'
