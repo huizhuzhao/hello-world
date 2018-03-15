@@ -2,6 +2,9 @@
 # encoding: utf-8
 # Created Time: 2017年01月21日 星期六 19时30分16秒
 
+import sys
+sys.path.append('/Users/zhaohuizhu/github/cnn_graph')
+from lib import graph
 import numpy as np
 import sklearn.metrics
 import sklearn.neighbors
@@ -93,12 +96,28 @@ def laplacian(W, normalized=True):
     return L
 
 
+def grid_graph(m, corners=False):
+    num_edges = 8
+    z = graph.grid(m)
+    dist, idx = graph.distance_sklearn_metrics(z, k=8, metric='euclidean')
+    A = graph.adjacency(dist, idx)
+
+    print('A.nnz: {}'.format(A.nnz))
+    if corners:
+        import scipy.sparse
+        A = A.toarray()
+        A[A < A.max()/1.5] = 0
+        A = scipy.sparse.csr_matrix(A)
+        print('{} edges'.format(A.nnz))
+
+    print("{} > {} edges".format(A.nnz // 2, num_edges * (m**2) // 2))
+    return A
+
+
 def main():
-    z = grid(10)
-    d1, idx1 = distance_sklearn_metrics(z)
-    d2, idx2 = distance_scipy_spatial(z)
-    W = adjacency(d1, idx1)
-    laplacian(W, True) 
+    A = grid_graph(28, corners=False)
+    A = graph.replace_random_edges(A, 0)
+    print(A.shape)
 
 
 
