@@ -2,14 +2,15 @@
 # encoding: utf-8
 # Created Time: 2017年01月21日 星期六 19时30分16秒
 
+import logging
 import sys
-sys.path.append('/Users/zhaohuizhu/github/cnn_graph')
+sys.path.append('/home/xtalpi/github/cnn_graph')
 from lib import graph
 import numpy as np
 import sklearn.metrics
 import sklearn.neighbors
 import scipy.spatial.distance
-from foundation.utils import numpy_utils
+from foundation.utils import numpy_utils, generic_utils
 
 
 def grid(m, dtype=np.float32):
@@ -97,11 +98,13 @@ def laplacian(W, normalized=True):
 
 
 def grid_graph(m, corners=False):
+    """
+    返回 graph 的连接矩阵(symmetric, nearest k neighbors)
+    """
     num_edges = 8
     z = graph.grid(m)
     dist, idx = graph.distance_sklearn_metrics(z, k=8, metric='euclidean')
     A = graph.adjacency(dist, idx)
-
     print('A.nnz: {}'.format(A.nnz))
     if corners:
         import scipy.sparse
@@ -113,12 +116,38 @@ def grid_graph(m, corners=False):
     print("{} > {} edges".format(A.nnz // 2, num_edges * (m**2) // 2))
     return A
 
+def replace_random_edges(A, noise_level):
+    M, M = A.shape
+    n = int(noise_level * A.nnz // 2)
+    indices = np.random.permutation(A.nnz // 2)[:n]
+
+    rows = np.random.randint(0, M, n)
+    cols = np.random.randint(0, M, n)
+    vals = np.random.uniform(0, 1, n)
+    assert len(indices) == len(rows) == len(cols) == len(vals)
+
+    A_coo = scipy.sparse.triu(A, format='coo')
+    assert A_coo.nnz == A.nnz // 2, ("{} {} do not match".format(A_coo.nnz, A.nnz // 2))
+    assert A_coo.nnz >= n
+    A = A.tolil() # to linked list format
+    for idx, row, col, val in zip(indices, rows, cols, vals):
+        old_row = A_coo.row[idx]
+        old_col = A_coo.col[idx]
+        A[old_row, old_col] = 0
+        A[old_col, old_row] = 0
+        A[row, col] = 1
+        A[col, row] = 1
+
+    A.setdiag(0)
+    A = A.tocsr()
+    A.eliminate_zeros()
+    return A
+
 
 def main():
+    logger = generic_utils.get_logger(level='debug')
     A = grid_graph(28, corners=False)
-    A = graph.replace_random_edges(A, 0)
-    print(A.shape)
-
+    A = replace_random_edges(A, 0.3)
 
 
 if __name__ == '__main__':
